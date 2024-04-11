@@ -18,21 +18,24 @@ textstat==0.7.2 (if running the ML part)\
 xgboost==1.5.2 (if running the ML part)
 """
 
-from google.colab import drive
-drive.mount('/content/drive')
-
-!pip install fsspec==2023.6.0
-!pip install torch==2.2.1
-!pip install accelerate==0.26.1
+# pip install fsspec==2023.6.0
+# pip install torch==2.2.1
+# pip install accelerate==0.26.1
+# pip install textstat
+# pip install datasets
+# python3 -m pip install pandas
+# python3 -m pip install -U scikit-learn
+# python3 -m pip install tensorflow
+# python3 -m pip install transformers
 
 import pandas as pd
 import numpy as np
 
-data = pd.read_csv("/content/drive/MyDrive/Colab_Notebooks/CognitiveComplexityMoE/sample_full.csv")
+data = pd.read_csv("/home/ubuntu/esokli/CognitiveComplexityMoE/Data/sample_full.csv")
 
 data.fillna({'Remember': 0, 'Understand': 0, 'Apply': 0, 'Analyze': 0, 'Evaluate': 0, 'Create':0}, inplace=True)
 
-LIWC_data = pd.read_csv("/content/drive/MyDrive/Colab_Notebooks/CognitiveComplexityMoE/LIWC2015 Results (Learning_outcome.csv).csv")
+LIWC_data = pd.read_csv("/home/ubuntu/esokli/CognitiveComplexityMoE/Data/LIWC2015 Results (Learning_outcome.csv).csv")
 data = data.join(LIWC_data).drop(['A'], axis=1)
 
 data.head()
@@ -50,8 +53,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report, cohen_kappa_score, f1_score
 
 """## ML Test"""
-
-!pip install textstat
 import textstat
 
 def generateX(data_x, test_x, textual_column_index, start_index_LIWC, end_index_LIWC):
@@ -175,8 +176,6 @@ print(cohen_kappa_score(ml_golden_df['Create'].tolist(), ml_result_df['Create'].
 
 """## BERT"""
 
-!pip install datasets
-
 import torch
 import tensorflow as tf
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, AutoModelForSequenceClassification, EarlyStoppingCallback
@@ -209,7 +208,7 @@ test_encoded = tokenizer(test_x, truncation=True, padding=True, max_length=100)
 train_set, val_set, test_set = EncodeDataset(train_encoded, train_y), EncodeDataset(val_encoded, val_y), EncodeDataset(test_encoded, test_y)
 
 training_args = TrainingArguments(
-        output_dir='/content/drive/MyDrive/Colab_Notebooks/CognitiveComplexityMoE/multilabel',          # output directory
+        output_dir='/home/ubuntu/esokli/CognitiveComplexityMoE/Classifier',          # output directory
         overwrite_output_dir=True,
         num_train_epochs=3,              # total number of training epochs
         per_device_train_batch_size=64,  # batch size per device during training
