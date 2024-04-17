@@ -52,128 +52,6 @@ from sklearn import metrics
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report, cohen_kappa_score, f1_score
 
-"""## ML Test"""
-import textstat
-
-def generateX(data_x, test_x, textual_column_index, start_index_LIWC, end_index_LIWC):
-    column_names = []
-    print("Getting Unigram...")
-    uni_cv = CountVectorizer(stop_words='english', ngram_range=(1, 1), max_features=1000)
-    unigram = uni_cv.fit_transform(data_x[:, textual_column_index])
-    unigram = unigram.toarray()
-    unigram_test = uni_cv.transform(test_x[:,textual_column_index]).toarray()
-    temp = uni_cv.get_feature_names_out().tolist()
-    column_names += ["uni_"+name for name in temp]
-    print("Getting Bigram...")
-    bi_cv = CountVectorizer(stop_words='english', ngram_range=(2, 2), max_features=1000)
-    bigram = bi_cv.fit_transform(data_x[:, textual_column_index])
-    bigram = bigram.toarray()
-    bigram_test = bi_cv.transform(test_x[:, textual_column_index]).toarray()
-    temp = bi_cv.get_feature_names_out().tolist()
-    column_names += ["bi_"+name for name in temp]
-    print("Getting Tfidf...")
-    tfidf = TfidfVectorizer(stop_words='english', ngram_range=(1, 1), max_features=1000)
-    t = tfidf.fit_transform(data_x[:, textual_column_index])
-    t = t.toarray()
-    t_test = tfidf.transform(test_x[:, textual_column_index]).toarray()
-    temp = tfidf.get_feature_names_out().tolist()
-    column_names += ["tfidf_"+name for name in temp]
-    print("Getting ARI...")
-    ari = [textstat.automated_readability_index(text) for text in data_x[:, textual_column_index]]
-    ari_test = [textstat.automated_readability_index(text) for text in test_x[:, textual_column_index]]
-    column_names.append("ari")
-    combined_data_x = []
-    combined_test_x = []
-    print("Combining...")
-    for i in range(len(data_x)):
-        combined_data_x.append(unigram[i].tolist()
-                              + bigram[i].tolist()
-                              + t[i].tolist()
-                              + [ari[i]]
-                              + data_x[i, start_index_LIWC:end_index_LIWC].tolist())
-    for i in range(len(test_x)):
-        combined_test_x.append(unigram_test[i].tolist()
-                              + bigram_test[i].tolist()
-                              + t_test[i].tolist()
-                              + [ari_test[i]]
-                              + test_x[i, start_index_LIWC:end_index_LIWC].tolist())
-    print("Generated feature shape is", np.array(combined_data_x).shape)
-    print("Generated test feature is", np.array(combined_test_x).shape)
-    return combined_data_x, column_names, combined_test_x
-
-data.drop(columns=list(data.columns[1:7])).iloc[:, 0]
-
-train_x, test_x, train_y, test_y = train_test_split(data.drop(columns=list(data.columns[1:8])), data[data.columns[1:7]], test_size=0.2, random_state=666)
-
-np.unique(train_y['Remember'].tolist(), return_counts=True), np.unique(test_y['Remember'].tolist(), return_counts=True)
-
-np.unique(train_y['Understand'].tolist(), return_counts=True), np.unique(test_y['Understand'].tolist(), return_counts=True)
-
-np.unique(train_y['Apply'].tolist(), return_counts=True), np.unique(test_y['Apply'].tolist(), return_counts=True)
-
-np.unique(train_y['Analyze'].tolist(), return_counts=True), np.unique(test_y['Analyze'].tolist(), return_counts=True)
-
-np.unique(train_y['Evaluate'].tolist(), return_counts=True), np.unique(test_y['Evaluate'].tolist(), return_counts=True)
-
-np.unique(train_y['Create'].tolist(), return_counts=True), np.unique(test_y['Create'].tolist(), return_counts=True)
-
-one_hot = []
-for d in data[data.columns[1:7]].values:
-    one_hot.append(np.array2string(d).count("1"))
-np.unique(one_hot, return_counts=True)
-
-ml_train_x, column_names, ml_test_x = generateX(train_x.to_numpy(), test_x.to_numpy(), 0, 1, 94)
-
-column_names += data.columns[7:].tolist()
-
-rf = RandomForestClassifier()
-rf.fit(ml_train_x, train_y)
-
-"""#MS-MARCO Queries"""
-
-print(ml_test_x[0])
-print(ml_test_x[1])
-
-"""#-------------------End Line-------------------"""
-
-pred_y = rf.predict(ml_test_x)
-
-print(classification_report(test_y, pred_y, output_dict=False, target_names=list(data.columns[1:7]), digits=3))
-
-pred_score_y = rf.predict_proba(ml_test_x)
-
-np.array(test_x).shape
-
-np.array(pred_score_y).shape
-
-pred_score_y = np.transpose([score[:, 1] for score in rf.predict_proba(ml_test_x)])
-
-roc_auc_score(test_y, pred_score_y, average=None)
-
-f1_score(test_y, pred_y, average="micro")
-
-accuracy_score(test_y, pred_y)
-
-ml_result_df = pd.DataFrame(data=pred_y, columns=data.columns[1:7])
-
-ml_result_df
-
-ml_golden_df = pd.DataFrame(data=test_y, columns=data.columns[1:7])
-
-print(accuracy_score(ml_golden_df['Remember'].tolist(), ml_result_df['Remember'].tolist()))
-print(accuracy_score(ml_golden_df['Understand'].tolist(), ml_result_df['Understand'].tolist()))
-print(accuracy_score(ml_golden_df['Apply'].tolist(), ml_result_df['Apply'].tolist()))
-print(accuracy_score(ml_golden_df['Analyze'].tolist(), ml_result_df['Analyze'].tolist()))
-print(accuracy_score(ml_golden_df['Evaluate'].tolist(), ml_result_df['Evaluate'].tolist()))
-print(accuracy_score(ml_golden_df['Create'].tolist(), ml_result_df['Create'].tolist()))
-
-print(cohen_kappa_score(ml_golden_df['Remember'].tolist(), ml_result_df['Remember'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Understand'].tolist(), ml_result_df['Understand'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Apply'].tolist(), ml_result_df['Apply'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Analyze'].tolist(), ml_result_df['Analyze'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Evaluate'].tolist(), ml_result_df['Evaluate'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Create'].tolist(), ml_result_df['Create'].tolist()))
-
 """## BERT"""
 
 import torch
@@ -196,7 +74,8 @@ class EncodeDataset(torch.utils.data.Dataset):
         return len(self.labels)
 
 tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased', problem_type="multi_label_classification")
-model = AutoModelForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=6, problem_type="multi_label_classification")
+# model = AutoModelForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=6, problem_type="multi_label_classification")
+model = AutoModelForSequenceClassification.from_pretrained('/home/ubuntu/esokli/CognitiveComplexityMoE/Classifier/checkpoint-520', num_labels=6, problem_type="multi_label_classification")
 
 train_x, test_x, train_y, test_y = train_test_split(data['Learning_outcome'].tolist(), labels, test_size=0.2, random_state=666)
 train_x, val_x, train_y, val_y = train_test_split(train_x, train_y, test_size=0.2, random_state=666)
@@ -284,3 +163,119 @@ print(cohen_kappa_score(ml_golden_df['Analyze'].tolist(), dl_result_df['Analyze'
 print(cohen_kappa_score(ml_golden_df['Evaluate'].tolist(), dl_result_df['Evaluate'].tolist()))
 print(cohen_kappa_score(ml_golden_df['Create'].tolist(), dl_result_df['Create'].tolist()))
 
+
+
+# """## ML Test"""
+# import textstat
+
+# def generateX(data_x, test_x, textual_column_index, start_index_LIWC, end_index_LIWC):
+#     column_names = []
+#     print("Getting Unigram...")
+#     uni_cv = CountVectorizer(stop_words='english', ngram_range=(1, 1), max_features=1000)
+#     unigram = uni_cv.fit_transform(data_x[:, textual_column_index])
+#     unigram = unigram.toarray()
+#     unigram_test = uni_cv.transform(test_x[:,textual_column_index]).toarray()
+#     temp = uni_cv.get_feature_names_out().tolist()
+#     column_names += ["uni_"+name for name in temp]
+#     print("Getting Bigram...")
+#     bi_cv = CountVectorizer(stop_words='english', ngram_range=(2, 2), max_features=1000)
+#     bigram = bi_cv.fit_transform(data_x[:, textual_column_index])
+#     bigram = bigram.toarray()
+#     bigram_test = bi_cv.transform(test_x[:, textual_column_index]).toarray()
+#     temp = bi_cv.get_feature_names_out().tolist()
+#     column_names += ["bi_"+name for name in temp]
+#     print("Getting Tfidf...")
+#     tfidf = TfidfVectorizer(stop_words='english', ngram_range=(1, 1), max_features=1000)
+#     t = tfidf.fit_transform(data_x[:, textual_column_index])
+#     t = t.toarray()
+#     t_test = tfidf.transform(test_x[:, textual_column_index]).toarray()
+#     temp = tfidf.get_feature_names_out().tolist()
+#     column_names += ["tfidf_"+name for name in temp]
+#     print("Getting ARI...")
+#     ari = [textstat.automated_readability_index(text) for text in data_x[:, textual_column_index]]
+#     ari_test = [textstat.automated_readability_index(text) for text in test_x[:, textual_column_index]]
+#     column_names.append("ari")
+#     combined_data_x = []
+#     combined_test_x = []
+#     print("Combining...")
+#     for i in range(len(data_x)):
+#         combined_data_x.append(unigram[i].tolist()
+#                               + bigram[i].tolist()
+#                               + t[i].tolist()
+#                               + [ari[i]]
+#                               + data_x[i, start_index_LIWC:end_index_LIWC].tolist())
+#     for i in range(len(test_x)):
+#         combined_test_x.append(unigram_test[i].tolist()
+#                               + bigram_test[i].tolist()
+#                               + t_test[i].tolist()
+#                               + [ari_test[i]]
+#                               + test_x[i, start_index_LIWC:end_index_LIWC].tolist())
+#     print("Generated feature shape is", np.array(combined_data_x).shape)
+#     print("Generated test feature is", np.array(combined_test_x).shape)
+#     return combined_data_x, column_names, combined_test_x
+
+# data.drop(columns=list(data.columns[1:7])).iloc[:, 0]
+
+# train_x, test_x, train_y, test_y = train_test_split(data.drop(columns=list(data.columns[1:8])), data[data.columns[1:7]], test_size=0.2, random_state=666)
+
+# np.unique(train_y['Remember'].tolist(), return_counts=True), np.unique(test_y['Remember'].tolist(), return_counts=True)
+
+# np.unique(train_y['Understand'].tolist(), return_counts=True), np.unique(test_y['Understand'].tolist(), return_counts=True)
+
+# np.unique(train_y['Apply'].tolist(), return_counts=True), np.unique(test_y['Apply'].tolist(), return_counts=True)
+
+# np.unique(train_y['Analyze'].tolist(), return_counts=True), np.unique(test_y['Analyze'].tolist(), return_counts=True)
+
+# np.unique(train_y['Evaluate'].tolist(), return_counts=True), np.unique(test_y['Evaluate'].tolist(), return_counts=True)
+
+# np.unique(train_y['Create'].tolist(), return_counts=True), np.unique(test_y['Create'].tolist(), return_counts=True)
+
+# one_hot = []
+# for d in data[data.columns[1:7]].values:
+#     one_hot.append(np.array2string(d).count("1"))
+# np.unique(one_hot, return_counts=True)
+
+# ml_train_x, column_names, ml_test_x = generateX(train_x.to_numpy(), test_x.to_numpy(), 0, 1, 94)
+
+# column_names += data.columns[7:].tolist()
+
+# rf = RandomForestClassifier()
+# rf.fit(ml_train_x, train_y)
+
+# pred_y = rf.predict(ml_test_x)
+
+# print(classification_report(test_y, pred_y, output_dict=False, target_names=list(data.columns[1:7]), digits=3))
+
+# pred_score_y = rf.predict_proba(ml_test_x)
+
+# np.array(test_x).shape
+
+# np.array(pred_score_y).shape
+
+# pred_score_y = np.transpose([score[:, 1] for score in rf.predict_proba(ml_test_x)])
+
+# roc_auc_score(test_y, pred_score_y, average=None)
+
+# f1_score(test_y, pred_y, average="micro")
+
+# accuracy_score(test_y, pred_y)
+
+# ml_result_df = pd.DataFrame(data=pred_y, columns=data.columns[1:7])
+
+# ml_result_df
+
+# ml_golden_df = pd.DataFrame(data=test_y, columns=data.columns[1:7])
+
+# print(accuracy_score(ml_golden_df['Remember'].tolist(), ml_result_df['Remember'].tolist()))
+# print(accuracy_score(ml_golden_df['Understand'].tolist(), ml_result_df['Understand'].tolist()))
+# print(accuracy_score(ml_golden_df['Apply'].tolist(), ml_result_df['Apply'].tolist()))
+# print(accuracy_score(ml_golden_df['Analyze'].tolist(), ml_result_df['Analyze'].tolist()))
+# print(accuracy_score(ml_golden_df['Evaluate'].tolist(), ml_result_df['Evaluate'].tolist()))
+# print(accuracy_score(ml_golden_df['Create'].tolist(), ml_result_df['Create'].tolist()))
+
+# print(cohen_kappa_score(ml_golden_df['Remember'].tolist(), ml_result_df['Remember'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Understand'].tolist(), ml_result_df['Understand'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Apply'].tolist(), ml_result_df['Apply'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Analyze'].tolist(), ml_result_df['Analyze'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Evaluate'].tolist(), ml_result_df['Evaluate'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Create'].tolist(), ml_result_df['Create'].tolist()))

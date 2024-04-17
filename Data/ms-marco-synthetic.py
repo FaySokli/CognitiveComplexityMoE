@@ -7,9 +7,9 @@ Original file is located at
     https://colab.research.google.com/drive/1ZlxIexxl_T_3NfzA0dzW-YwAsAGRvqx-
 """
 
-!pip install torch torchvision torchaudio
-!pip install transformers
-!pip install datasets
+# pip install torch torchvision torchaudio
+# pip install transformers
+# pip install datasets
 
 from datasets import load_dataset
 
@@ -23,7 +23,7 @@ ms_marco.head()
 
 queries = ms_marco[['query', 'query_id']].copy()
 queries.set_index('query_id', inplace=True)
-queries.head()
+print(queries.head())
 
 temp = []
 
@@ -53,10 +53,6 @@ for index, row in temp_df.iterrows():
     else:
         passages_temp.append(row.to_dict())
 
-# Convert the expanded data back into a DataFrame
+
 passages = pd.DataFrame(passages_temp)
-
-passages.head(20)
-
-passages.head(20)
-
+print(passages.head(20))
