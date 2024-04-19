@@ -24,6 +24,7 @@ ms_marco.head()
 queries = ms_marco[['query', 'query_id']].copy()
 queries.set_index('query_id', inplace=True)
 print(queries.head())
+queries.to_csv('queries.csv')
 
 temp = []
 
@@ -56,3 +57,4 @@ for index, row in temp_df.iterrows():
 
 passages = pd.DataFrame(passages_temp)
 print(passages.head(20))
+passages.to_csv('passages.csv')

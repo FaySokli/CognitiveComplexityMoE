@@ -59,6 +59,12 @@ import tensorflow as tf
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, AutoModelForSequenceClassification, EarlyStoppingCallback
 from transformers import TFBertPreTrainedModel, TFBertMainLayer, InputFeatures
 from datasets import load_metric, list_metrics
+from torch.utils.data import TensorDataset, DataLoader, SequentialSampler
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class EncodeDataset(torch.utils.data.Dataset):
     def __init__(self, encodings, labels):
@@ -76,6 +82,12 @@ class EncodeDataset(torch.utils.data.Dataset):
 tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased', problem_type="multi_label_classification")
 # model = AutoModelForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=6, problem_type="multi_label_classification")
 model = AutoModelForSequenceClassification.from_pretrained('/home/ubuntu/esokli/CognitiveComplexityMoE/Classifier/checkpoint-520', num_labels=6, problem_type="multi_label_classification")
+
+# Check if CUDA is available and set the device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Move the model to the device
+model = model.to(device)
 
 train_x, test_x, train_y, test_y = train_test_split(data['Learning_outcome'].tolist(), labels, test_size=0.2, random_state=666)
 train_x, val_x, train_y, val_y = train_test_split(train_x, train_y, test_size=0.2, random_state=666)
@@ -149,21 +161,61 @@ accuracy_score(np.array(test_y), predicted_label)
 
 dl_result_df = pd.DataFrame(data=predicted_label, columns=data.columns[1:7])
 
-print(accuracy_score(ml_golden_df['Remember'].tolist(), dl_result_df['Remember'].tolist()))
-print(accuracy_score(ml_golden_df['Understand'].tolist(), dl_result_df['Understand'].tolist()))
-print(accuracy_score(ml_golden_df['Apply'].tolist(), dl_result_df['Apply'].tolist()))
-print(accuracy_score(ml_golden_df['Analyze'].tolist(), dl_result_df['Analyze'].tolist()))
-print(accuracy_score(ml_golden_df['Evaluate'].tolist(), dl_result_df['Evaluate'].tolist()))
-print(accuracy_score(ml_golden_df['Create'].tolist(), dl_result_df['Create'].tolist()))
+# print(accuracy_score(ml_golden_df['Remember'].tolist(), dl_result_df['Remember'].tolist()))
+# print(accuracy_score(ml_golden_df['Understand'].tolist(), dl_result_df['Understand'].tolist()))
+# print(accuracy_score(ml_golden_df['Apply'].tolist(), dl_result_df['Apply'].tolist()))
+# print(accuracy_score(ml_golden_df['Analyze'].tolist(), dl_result_df['Analyze'].tolist()))
+# print(accuracy_score(ml_golden_df['Evaluate'].tolist(), dl_result_df['Evaluate'].tolist()))
+# print(accuracy_score(ml_golden_df['Create'].tolist(), dl_result_df['Create'].tolist()))
 
-print(cohen_kappa_score(ml_golden_df['Remember'].tolist(), dl_result_df['Remember'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Understand'].tolist(), dl_result_df['Understand'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Apply'].tolist(), dl_result_df['Apply'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Analyze'].tolist(), dl_result_df['Analyze'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Evaluate'].tolist(), dl_result_df['Evaluate'].tolist()))
-print(cohen_kappa_score(ml_golden_df['Create'].tolist(), dl_result_df['Create'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Remember'].tolist(), dl_result_df['Remember'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Understand'].tolist(), dl_result_df['Understand'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Apply'].tolist(), dl_result_df['Apply'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Analyze'].tolist(), dl_result_df['Analyze'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Evaluate'].tolist(), dl_result_df['Evaluate'].tolist()))
+# print(cohen_kappa_score(ml_golden_df['Create'].tolist(), dl_result_df['Create'].tolist()))
 
+# Load the datasets
+logger.info("Loading datasets...")
+queries = pd.read_csv('/home/ubuntu/esokli/CognitiveComplexityMoE/Data/queries.csv')
+passages = pd.read_csv('/home/ubuntu/esokli/CognitiveComplexityMoE/Data/passages.csv')
 
+# Filter the 'passages' dataframe
+logger.info("Filtering passages...")
+passages_filtered = passages[passages['passage_param'] == 'passage_text']
+
+# Function to predict labels using BERT
+def predict_labels(texts, batch_size=16):
+    logger.info("Predicting labels...")
+    preds = []
+    for i in range(0, len(texts), batch_size):
+        logger.info(f"Processing batch {i//batch_size + 1}/{len(texts)//batch_size + 1}...")
+        batch_texts = texts[i:i+batch_size]
+        inputs = tokenizer(batch_texts.to_list(), return_tensors='pt', padding=True, truncation=True, max_length=512)
+        inputs = {name: tensor.to(device) for name, tensor in inputs.items()}  # move inputs to device
+        with torch.no_grad():
+            outputs = model(**inputs)
+        _, batch_preds = torch.max(outputs.logits, dim=1)
+        preds.extend(batch_preds.tolist())
+    return preds
+
+# Predict labels for the 'queries' and 'passages' datasets
+logger.info("Predicting labels for queries...")
+queries['label'] = predict_labels(queries['query'])
+logger.info("Saving queries results...")
+queries.to_csv('queries_with_labels.csv', index=False)
+
+logger.info("Predicting labels for passages...")
+passages_filtered['label'] = predict_labels(passages_filtered['passage_val'])
+
+# Merge the predicted labels back into the original 'passages' DataFrame
+logger.info("Merging predicted labels for passages...")
+passages = passages.merge(passages_filtered[['label']], left_index=True, right_index=True, how='left')
+
+logger.info("Saving passages results...")
+passages.to_csv('passages_with_labels.csv', index=False)
+
+logger.info("Done.")
 
 # """## ML Test"""
 # import textstat
